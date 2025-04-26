@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AR Car Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/webxr/ARButton.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #buttonPanel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+    }
+    #buttonPanel button {
+      margin: 5px;
+      padding: 10px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="buttonPanel">
+  <button id="learnMore">Learn More</button>
+  <button onclick="changeColor('black')">Black</button>
+  <button onclick="changeColor('white')">White</button>
+  <button onclick="changeColor('red')">Red</button>
+  <button onclick="changeColor('silver')">Silver</button>
+</div>
+
+<script>
+let camera, scene, renderer, controller;
+let carModel = null;
+let humanModel = null;
+let sound = null;
+let listener = null;
+
+// 资源链接（用 jsdelivr 加速）
+const CAR_URL = "https://cdn.jsdelivr.net/gh/CyrilFlyta/MR-CW/audi-rs7.glb";
+const HUMAN_URL = "https://cdn.jsdelivr.net/gh/CyrilFlyta/MR-CW/businessman.glb";
+const AUDIO_URL = "https://cdn.jsdelivr.net/gh/CyrilFlyta/MR-CW/audi-rs7.mp3";
+
+init();
+animate();
+
+function init() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera();
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+
+  document.body.appendChild(ARButton.createButton(renderer));
+
+  controller = renderer.xr.getController(0);
+  controller.addEventListener('select', onSelect);
+  scene.add(controller);
+
+  // 加载车模型
+  const loader = new THREE.GLTFLoader();
+  loader.load(CAR_URL, function(gltf) {
+    carModel = gltf.scene;
+    carModel.scale.set(0.01, 0.01, 0.01); // 车型调整
+    carModel.visible = false;
+    scene.add(carModel);
+  });
+
+  // 加载人模型
+  loader.load(HUMAN_URL, function(gltf) {
+    humanModel = gltf.scene;
+    humanModel.scale.set(0.01, 0.01, 0.01);
+    humanModel.visible = false;
+    scene.add(humanModel);
+  });
+
+  // 加载音频
+  listener = new THREE.AudioListener();
+  camera.add(listener);
+  sound = new THREE.PositionalAudio(listener);
+  const audioLoader = new THREE.AudioLoader();
+  audioLoader.load(AUDIO_URL, function(buffer) {
+    sound.setBuffer(buffer);
+    sound.setRefDistance(1);
+    sound.setLoop(false);
+    sound.setVolume(1);
+    humanModel?.add(sound);
+  });
+
+  // Learn More 按钮
+  document.getElementById('learnMore').addEventListener('click', () => {
+    if (humanModel) {
+      humanModel.visible = true;
+      if (sound && !sound.isPlaying) {
+        sound.play();
+      }
+    }
+  });
+}
+
+function onSelect() {
+  if (carModel) {
+    carModel.position.setFromMatrixPosition(controller.matrixWorld);
+    carModel.visible = true;
+  }
+}
+
+function animate() {
+  renderer.setAnimationLoop(render);
+}
+
+function render() {
+  renderer.render(scene, camera);
+}
+
+function changeColor(color) {
+  if (!carModel) return;
+
+  carModel.traverse((child) => {
+    if (child.isMesh) {
+      child.material.color.set(color);
+    }
+  });
+}
+</script>
+
+</body>
+</html>
